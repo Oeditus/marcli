@@ -1,0 +1,163 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Release Artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: '1.17'
+          otp-version: '27'
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Restore dependencies cache
+        uses: actions/cache@v4
+        with:
+          path: deps
+          key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
+          restore-keys: ${{ runner.os }}-mix-
+
+      - name: Install dependencies
+        run: mix deps.get --only prod
+
+      - name: Compile project
+        run: MIX_ENV=prod mix compile
+
+      - name: Build hex archive
+        run: MIX_ENV=prod mix archive.build
+
+      - name: Verify artifacts
+        run: |
+          ls -lh marcli-*.ez
+          echo "Archive size: $(du -h marcli-*.ez | cut -f1)"
+
+      - name: Generate checksums
+        run: |
+          sha256sum marcli-*.ez > marcli-archive.sha256
+          cat marcli-archive.sha256
+
+      - name: Create release notes
+        id: release_notes
+        run: |
+          cat > RELEASE_NOTES.md << 'EOF'
+          ## Installation
+
+          ### Mix Dependency (Recommended)
+
+          Add to your `mix.exs`:
+
+          ```elixir
+          def deps do
+            [
+              {:marcli, "~> ${{ steps.version.outputs.version }}"}
+            ]
+          end
+          ```
+
+          Then run:
+
+          ```bash
+          mix deps.get
+          ```
+
+          ## What's Changed
+
+          See [README.md](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/README.md) for usage details.
+
+          ## Verification
+
+          Verify the downloaded files using SHA256 checksums:
+
+          ```bash
+          sha256sum -c marcli-archive.sha256
+          ```
+
+          ## Documentation
+
+          - [API Documentation](https://hexdocs.pm/marcli)
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            marcli-*.ez
+            marcli-archive.sha256
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') || contains(github.ref, 'dev') }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-hex:
+    name: Publish to Hex.pm
+    runs-on: ubuntu-latest
+    needs: build
+    if: "!contains(github.ref, 'alpha') && !contains(github.ref, 'beta') && !contains(github.ref, 'rc') && !contains(github.ref, 'dev')"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: '1.17'
+          otp-version: '27'
+
+      - name: Restore dependencies cache
+        uses: actions/cache@v4
+        with:
+          path: deps
+          key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
+          restore-keys: ${{ runner.os }}-mix-
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Publish to Hex
+        run: mix hex.publish --yes
+        env:
+          HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
+
+  notify:
+    name: Notify Release
+    runs-on: ubuntu-latest
+    needs: [build, publish-hex]
+    if: always()
+    steps:
+      - name: Check release status
+        run: |
+          if [ "${{ needs.build.result }}" != "success" ]; then
+            echo "Build failed!"
+            exit 1
+          fi
+
+          if [ "${{ needs.publish-hex.result }}" == "skipped" ]; then
+            echo "Hex publishing skipped (pre-release)"
+          elif [ "${{ needs.publish-hex.result }}" != "success" ]; then
+            echo "Hex publishing failed!"
+            exit 1
+          fi
+
+          echo "Release completed successfully!"
+          echo "Download artifacts from: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
