@@ -10,7 +10,7 @@ inline formatting, links, images, and more as richly styled output for terminal 
 
 ## Screenshot
 
-![Marcli terminal output](stuff/img/screenshot.png)
+![Marcli terminal output](https://raw.githubusercontent.com/Oeditus/marcli/v0.1.0/stuff/img/screenshot.png)
 
 ## Supported Elements
 
