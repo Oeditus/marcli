@@ -257,7 +257,8 @@ defmodule Marcli do
          lang when is_binary(lang) and lang != "" <- extract_language(info),
          true <- Code.ensure_loaded?(Makeup.Registry),
          :ok <- ensure_lexer_started(lang),
-         {:ok, {lexer, lexer_opts}} <- Makeup.Registry.fetch_lexer_by_name(lang) do
+         # credo:disable-for-next-line
+         {:ok, {lexer, lexer_opts}} <- apply(Makeup.Registry, :fetch_lexer_by_name, [lang]) do
       tokens = lexer.lex(code, lexer_opts)
       Marcli.Formatter.format_as_binary(tokens, syntax: theme.syntax, reset: theme.reset)
     else
