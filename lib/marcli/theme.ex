@@ -22,6 +22,64 @@ defmodule Marcli.Theme do
 
   @reset "\e[0m"
 
+  @default_syntax %{
+    # Comments
+    comment: "\e[3;90m",
+    # Errors
+    error: "\e[1;31m",
+    # Keywords
+    keyword: "\e[35m",
+    keyword_constant: "\e[36m",
+    keyword_declaration: "\e[35m",
+    keyword_namespace: "\e[35m",
+    keyword_pseudo: "\e[35m",
+    keyword_reserved: "\e[35m",
+    keyword_type: "\e[36m",
+    # Names
+    name_attribute: "\e[33m",
+    name_builtin: "\e[36m",
+    name_builtin_pseudo: "\e[36m",
+    name_class: "\e[1;36m",
+    name_constant: "\e[1;33m",
+    name_decorator: "\e[33m",
+    name_entity: "\e[1;33m",
+    name_exception: "\e[1;31m",
+    name_function: "\e[33m",
+    name_function_magic: "\e[33m",
+    name_label: "\e[36m",
+    name_namespace: "\e[1;36m",
+    name_tag: "\e[1;35m",
+    name_variable: "\e[37m",
+    # Strings
+    string: "\e[32m",
+    string_char: "\e[32m",
+    string_delimiter: "\e[32m",
+    string_doc: "\e[3;32m",
+    string_escape: "\e[1;32m",
+    string_interpol: "\e[1;32m",
+    string_regex: "\e[31m",
+    string_sigil: "\e[32m",
+    string_symbol: "\e[36m",
+    # Numbers
+    number: "\e[34m",
+    # Operators
+    operator: "",
+    operator_word: "\e[35m",
+    # Punctuation
+    punctuation: "",
+    # Generic
+    generic_deleted: "\e[31m",
+    generic_emph: "\e[3m",
+    generic_error: "\e[31m",
+    generic_heading: "\e[1m",
+    generic_inserted: "\e[32m",
+    generic_output: "\e[90m",
+    generic_prompt: "\e[1m",
+    generic_strong: "\e[1m",
+    generic_subheading: "\e[1;35m",
+    generic_traceback: "\e[31m"
+  }
+
   defstruct reset: @reset,
 
             # Headings
@@ -74,7 +132,11 @@ defmodule Marcli.Theme do
             thematic_break_width: 40,
 
             # HTML blocks
-            html_block: "\e[2m"
+            html_block: "\e[2m",
+
+            # Syntax highlighting (Makeup integration)
+            syntax_highlight: true,
+            syntax: @default_syntax
 
   @type t :: %__MODULE__{
           reset: String.t(),
@@ -107,7 +169,9 @@ defmodule Marcli.Theme do
           thematic_break: String.t(),
           thematic_break_char: String.t(),
           thematic_break_width: non_neg_integer(),
-          html_block: String.t()
+          html_block: String.t(),
+          syntax_highlight: boolean(),
+          syntax: %{atom() => String.t()}
         }
 
   @doc "Returns the built-in default theme."
@@ -139,6 +203,19 @@ defmodule Marcli.Theme do
       #=> %Marcli.Theme{h1: "\\e[1;31m", ...defaults...}
   """
   @spec merge(keyword()) :: t()
-  def merge(overrides) when is_list(overrides), do: struct(default(), overrides)
+  def merge(overrides) when is_list(overrides) do
+    if Keyword.has_key?(overrides, :syntax) do
+      {syntax_overrides, rest} = Keyword.pop(overrides, :syntax)
+      base = struct(default(), rest)
+      %{base | syntax: Map.merge(base.syntax, syntax_overrides || %{})}
+    else
+      struct(default(), overrides)
+    end
+  end
+
   def merge(%__MODULE__{} = theme), do: theme
+
+  @doc "Returns the default syntax highlighting color map."
+  @spec default_syntax :: %{atom() => String.t()}
+  def default_syntax, do: @default_syntax
 end

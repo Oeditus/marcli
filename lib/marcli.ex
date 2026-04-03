@@ -10,12 +10,27 @@ defmodule Marcli do
   - Headings (h1: bold yellow, h2: bold cyan, h3+: bold white)
   - Bold, italic, strikethrough, inline code
   - Bullet lists (triangle markers) and ordered lists (circled numbers)
-  - Code blocks with optional language headers
+  - Code blocks with optional language headers (syntax-highlighted when a `makeup_lang` lexer is available)
   - Block quotes (vertical bar prefix)
   - Thematic breaks (horizontal rules)
   - Links (underlined blue with dimmed URL)
   - Images (bracketed alt text with URL)
   - Task list items (checkbox markers)
+
+  ## Syntax Highlighting
+
+  When a `makeup_<lang>` lexer library is present (e.g. `makeup_elixir`,
+  `makeup_erlang`, `makeup_html`), fenced code blocks tagged with a language
+  identifier are rendered with full ANSI syntax highlighting via
+  `Marcli.Formatter`.
+
+  Add the desired lexer(s) to your `mix.exs` dependencies:
+
+      {:makeup_elixir, ">= 0.0.0", optional: true}
+
+  No configuration is required -- the lexer is detected at runtime via
+  `Makeup.Registry`. If no matching lexer is loaded, the block is rendered
+  without highlighting.
 
   ## Options
 
@@ -101,7 +116,9 @@ defmodule Marcli do
 
   defp render_block(%MDEx.CodeBlock{literal: literal, info: info}, nl, theme) do
     code = String.trim_trailing(literal, "\n")
-    lines = String.split(code, "\n")
+    highlighted = maybe_highlight(code, info, theme)
+    lines = String.split(highlighted || code, "\n")
+    prefix = theme.code_border <> theme.code_left <> theme.reset
 
     header =
       if is_binary(info) and info != "",
@@ -110,7 +127,11 @@ defmodule Marcli do
 
     body =
       Enum.map_join(lines, nl, fn line ->
-        theme.code_border <> theme.code_left <> theme.reset <> theme.code_text <> line <> theme.reset
+        if highlighted do
+          prefix <> line
+        else
+          prefix <> theme.code_text <> line <> theme.reset
+        end
       end)
 
     footer = nl <> theme.code_border <> theme.code_bottom <> theme.reset
@@ -227,4 +248,37 @@ defmodule Marcli do
     do: Enum.at(theme.ordered_glyphs, n - 1) || "(#{n})"
 
   defp glyph(n, _theme), do: "(#{n})"
+
+  # Attempt syntax highlighting via Makeup when a lexer is available.
+  # Returns the ANSI-formatted string or nil on fallback.
+  defp maybe_highlight(code, info, theme) do
+    with true <- theme.syntax_highlight,
+         lang when is_binary(lang) and lang != "" <- extract_language(info),
+         true <- Code.ensure_loaded?(Makeup.Registry),
+         :ok <- ensure_lexer_started(lang),
+         {:ok, {lexer, lexer_opts}} <- Makeup.Registry.fetch_lexer_by_name(lang) do
+      tokens = lexer.lex(code, lexer_opts)
+      Marcli.Formatter.format_as_binary(tokens, syntax: theme.syntax, reset: theme.reset)
+    else
+      _ -> nil
+    end
+  rescue
+    _ -> nil
+  end
+
+  # Makeup lexers register themselves via OTP application callbacks.
+  # Ensure the core Makeup app and the language-specific lexer app
+  # (e.g. :makeup_elixir) are started so the registry is populated.
+  defp ensure_lexer_started(lang) do
+    Application.ensure_all_started(:makeup)
+    Application.ensure_all_started(:"makeup_#{lang}")
+    :ok
+  rescue
+    _ -> :ok
+  end
+
+  defp extract_language(info) when is_binary(info),
+    do: info |> String.split() |> List.first() |> Kernel.||("") |> String.downcase()
+
+  defp extract_language(_), do: nil
 end

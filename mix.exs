@@ -50,8 +50,10 @@ defmodule Marcli.MixProject do
   defp deps do
     [
       {:mdex, "~> 0.11"},
+      {:makeup, "~> 1.2", optional: true},
 
       # Dev / Test
+      {:makeup_elixir, "~> 1.0", only: [:dev, :test]},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false},
       {:excoveralls, "~> 0.18", only: :test, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
@@ -81,7 +83,7 @@ defmodule Marcli.MixProject do
   defp package do
     [
       name: @app,
-      files: ~w(lib stuff/img/logo-48x48.png .formatter.exs mix.exs README.md LICENSE),
+      files: ~w(lib stuff/img/logo-48x48.png stuff/img/screenshot.png .formatter.exs mix.exs README.md LICENSE),
       licenses: ["MIT"],
       maintainers: ["Aleksei Matiushkin"],
       links: %{

@@ -138,7 +138,8 @@ defmodule MarcliTest do
 
       result = Marcli.render(md)
       assert result =~ @dim <> "  \u250c\u2500 elixir" <> @reset
-      assert result =~ @green <> "IO.puts(\"hello\")" <> @reset
+      # Content is present (exact styling depends on whether Makeup lexer is active)
+      assert result =~ "puts"
       assert result =~ @dim <> "  \u2514\u2500" <> @reset
     end
 
@@ -237,6 +238,72 @@ defmodule MarcliTest do
       assert result =~ "Some intro text."
       assert result =~ "  \u25b8 item one"
       assert result =~ "  \u25b8 item two"
+    end
+  end
+
+  describe "syntax highlighting" do
+    setup do
+      Application.ensure_all_started(:makeup_elixir)
+      :ok
+    end
+
+    test "elixir code block is colored via Makeup" do
+      md = """
+      ```elixir
+      defmodule Foo do
+        def bar, do: 42
+      end
+      ```
+      """
+
+      result = Marcli.render(md)
+      theme = Marcli.Theme.default()
+
+      # With Makeup active, keywords get the keyword style (magenta),
+      # not the plain code_text fallback (green)
+      refute result =~ theme.code_text <> "defmodule"
+
+      # defmodule/def -> :keyword_declaration -> magenta
+      assert result =~ theme.syntax.keyword_declaration <> "defmodule" <> theme.reset
+
+      # Foo -> :name_class -> bold cyan
+      assert result =~ theme.syntax.name_class <> "Foo" <> theme.reset
+
+      # 42 -> :number_integer -> inherits from :number -> blue
+      assert result =~ theme.syntax.number <> "42" <> theme.reset
+
+      # bar -> :name_function -> yellow
+      assert result =~ theme.syntax.name_function <> "bar" <> theme.reset
+
+      # Border rendering is unchanged
+      assert result =~ theme.code_border <> theme.code_top <> " elixir" <> theme.reset
+      assert result =~ theme.code_border <> theme.code_bottom <> theme.reset
+    end
+
+    test "falls back to plain code_text for unknown languages" do
+      md = """
+      ```brainfuck
+      +++>+<-
+      ```
+      """
+
+      result = Marcli.render(md)
+      theme = Marcli.Theme.default()
+
+      assert result =~ theme.code_text <> "+++>+<-" <> theme.reset
+    end
+
+    test "syntax highlighting can be disabled via theme" do
+      md = """
+      ```elixir
+      def foo, do: :ok
+      ```
+      """
+
+      theme = %{Marcli.Theme.default() | syntax_highlight: false}
+      result = Marcli.render(md, theme: theme)
+
+      assert result =~ theme.code_text <> "def foo, do: :ok" <> theme.reset
     end
   end
 end
