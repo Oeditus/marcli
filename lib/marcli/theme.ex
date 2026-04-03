@@ -22,6 +22,7 @@ defmodule Marcli.Theme do
 
   @reset "\e[0m"
 
+  # credo:disable-for-lines:60
   @default_syntax %{
     # Comments
     comment: "\e[3;90m",
@@ -121,7 +122,8 @@ defmodule Marcli.Theme do
 
             # Ordered lists
             ordered_indent: "  ",
-            ordered_glyphs: ~w(\u2460 \u2461 \u2462 \u2463 \u2464 \u2465 \u2466 \u2467 \u2468 \u2469 \u246a \u246b \u246c \u246d \u246e \u246f \u2470 \u2471 \u2472 \u2473),
+            ordered_glyphs:
+              ~w(\u2460 \u2461 \u2462 \u2463 \u2464 \u2465 \u2466 \u2467 \u2468 \u2469 \u246a \u246b \u246c \u246d \u246e \u246f \u2470 \u2471 \u2472 \u2473),
 
             # List continuation indent (for loose list items)
             list_continuation: "    ",

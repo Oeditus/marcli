@@ -177,7 +177,8 @@ defmodule Marcli do
   defp render_bullet_item(other, nl, theme), do: render_block(other, nl, theme)
 
   defp render_ordered_item(%MDEx.ListItem{nodes: children}, idx, nl, theme),
-    do: theme.ordered_indent <> glyph(idx, theme) <> " " <> render_item_content(children, nl, theme)
+    do:
+      theme.ordered_indent <> glyph(idx, theme) <> " " <> render_item_content(children, nl, theme)
 
   defp render_ordered_item(other, _idx, nl, theme), do: render_block(other, nl, theme)
 

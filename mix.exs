@@ -83,7 +83,8 @@ defmodule Marcli.MixProject do
   defp package do
     [
       name: @app,
-      files: ~w(lib stuff/img/logo-48x48.png stuff/img/screenshot.png .formatter.exs mix.exs README.md LICENSE),
+      files:
+        ~w(lib stuff/img/logo-48x48.png stuff/img/screenshot.png .formatter.exs mix.exs README.md LICENSE),
       licenses: ["MIT"],
       maintainers: ["Aleksei Matiushkin"],
       links: %{
