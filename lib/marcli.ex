@@ -60,7 +60,7 @@ defmodule Marcli do
     ]
   ]
 
-  @type option :: {:newline, String.t()} | {:theme, Theme.t()}
+  @type option :: {:newline, String.t()} | {:theme, Theme.t()} | {:escape_sequences, boolean()}
 
   @doc """
   Renders a Markdown string as ANSI-escaped terminal output.
@@ -72,15 +72,21 @@ defmodule Marcli do
 
   - `:newline` -- the line ending sequence (default: `"\\n"`)
   - `:theme` -- a `Marcli.Theme` struct (default: `Marcli.Theme.default()`)
+  - `:escape_sequences` -- when `false`, strips all ANSI escape sequences
+    from the output (default: `true`)
   """
   @spec render(String.t(), [option()]) :: String.t()
   def render(markdown, opts \\ []) when is_binary(markdown) do
     theme = Keyword.get(opts, :theme, Theme.default())
     nl = Keyword.get(opts, :newline, "\n")
+    keep_ansi? = Keyword.get(opts, :escape_sequences, true)
 
-    markdown
-    |> MDEx.parse_document!(@parse_opts)
-    |> render_document(nl, theme)
+    result =
+      markdown
+      |> MDEx.parse_document!(@parse_opts)
+      |> render_document(nl, theme)
+
+    if keep_ansi?, do: result, else: strip_ansi(result)
   end
 
   defp render_document(%MDEx.Document{nodes: nodes}, nl, theme) do
