@@ -74,6 +74,17 @@
   # -- HTML blocks ------------------------------------------------------------
   html_block: "\e[2m",
 
+  # -- Tables -----------------------------------------------------------------
+  table_border: "\e[2m",
+  table_header: "\e[1m",
+  table_chars: %{
+    tl: "┌", tr: "┐", bl: "└", br: "┘",    # corners
+    h: "─", v: "│",                           # horizontal / vertical
+    tm: "┬", bm: "┴",                         # top-mid / bottom-mid
+    lm: "├", rm: "┤",                         # left-mid / right-mid
+    x: "┼"                                     # cross
+  },
+
   # -- Syntax highlighting (Makeup integration) -------------------------------
   # Set to false to disable Makeup-based syntax highlighting in code blocks.
   syntax_highlight: true,

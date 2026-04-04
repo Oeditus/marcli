@@ -136,6 +136,23 @@ defmodule Marcli.Theme do
             # HTML blocks
             html_block: "\e[2m",
 
+            # Tables
+            table_border: "\e[2m",
+            table_header: "\e[1m",
+            table_chars: %{
+              tl: "\u250c",
+              tr: "\u2510",
+              bl: "\u2514",
+              br: "\u2518",
+              h: "\u2500",
+              v: "\u2502",
+              tm: "\u252c",
+              bm: "\u2534",
+              lm: "\u251c",
+              rm: "\u2524",
+              x: "\u253c"
+            },
+
             # Syntax highlighting (Makeup integration)
             syntax_highlight: true,
             syntax: @default_syntax
@@ -172,6 +189,9 @@ defmodule Marcli.Theme do
           thematic_break_char: String.t(),
           thematic_break_width: non_neg_integer(),
           html_block: String.t(),
+          table_border: String.t(),
+          table_header: String.t(),
+          table_chars: %{atom() => String.t()},
           syntax_highlight: boolean(),
           syntax: %{atom() => String.t()}
         }
@@ -206,13 +226,19 @@ defmodule Marcli.Theme do
   """
   @spec merge(keyword()) :: t()
   def merge(overrides) when is_list(overrides) do
-    if Keyword.has_key?(overrides, :syntax) do
-      {syntax_overrides, rest} = Keyword.pop(overrides, :syntax)
-      base = struct(default(), rest)
-      %{base | syntax: Map.merge(base.syntax, syntax_overrides || %{})}
-    else
-      struct(default(), overrides)
-    end
+    Enum.reduce(overrides, default(), fn {key, value}, acc ->
+      if Map.has_key?(acc, key) do
+        existing = Map.get(acc, key)
+
+        cond do
+          is_map(existing) and is_map(value) -> %{acc | key => Map.merge(existing, value)}
+          is_map(existing) and is_nil(value) -> acc
+          true -> %{acc | key => value}
+        end
+      else
+        acc
+      end
+    end)
   end
 
   def merge(%__MODULE__{} = theme), do: theme

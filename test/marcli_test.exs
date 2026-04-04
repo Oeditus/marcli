@@ -222,6 +222,107 @@ defmodule MarcliTest do
     end
   end
 
+  describe "nested bullet lists" do
+    test "all nested items maintain consistent indentation" do
+      md = """
+      - Parent
+        - Child 1
+        - Child 2
+        - Child 3
+      """
+
+      result = Marcli.render(md)
+      lines = String.split(result, "\n")
+
+      assert [parent, c1, c2, c3] = lines
+      assert parent == "  \u25b8 Parent"
+      # 4-space list_continuation + 2-space bullet = 6 spaces before marker
+      assert c1 == "      \u25b8 Child 1"
+      assert c2 == "      \u25b8 Child 2"
+      assert c3 == "      \u25b8 Child 3"
+    end
+
+    test "deeply nested lists add further indentation" do
+      md = """
+      - A
+        - B
+          - C1
+          - C2
+      """
+
+      result = Marcli.render(md)
+      lines = String.split(result, "\n")
+
+      assert [a, b, c1, c2] = lines
+      assert a == "  \u25b8 A"
+      # B is nested once (6 spaces)
+      assert b == "      \u25b8 B"
+      # C items are nested twice (10 spaces)
+      assert c1 == "          \u25b8 C1"
+      assert c2 == "          \u25b8 C2"
+    end
+  end
+
+  describe "tables" do
+    test "renders with box-drawing characters" do
+      md = """
+      | Name  | Age |
+      |-------|-----|
+      | Alice | 30  |
+      | Bob   | 25  |
+      """
+
+      result = Marcli.render(md)
+
+      # Strip ANSI for structural checks
+      plain = String.replace(result, ~r/\e\[[0-9;]*m/, "")
+
+      assert plain =~ "\u250c"
+      assert plain =~ "\u2510"
+      assert plain =~ "\u2514"
+      assert plain =~ "\u2518"
+      assert plain =~ "\u251c"
+      assert plain =~ "\u2524"
+      assert plain =~ "\u253c"
+      assert plain =~ "\u252c"
+      assert plain =~ "\u2534"
+      assert plain =~ "Alice"
+      assert plain =~ "Bob"
+      assert plain =~ "Name"
+      assert plain =~ "Age"
+    end
+
+    test "columns are properly aligned" do
+      md = """
+      | Short | Longer header |
+      |-------|---------------|
+      | a     | b             |
+      """
+
+      result = Marcli.render(md)
+      plain = String.replace(result, ~r/\e\[[0-9;]*m/, "")
+      lines = String.split(plain, "\n")
+
+      # All border lines should have the same length
+      [top, _header, sep, _body, bot] = lines
+      assert String.length(top) == String.length(sep)
+      assert String.length(sep) == String.length(bot)
+    end
+
+    test "header cells are styled with table_header" do
+      md = """
+      | H1 |
+      |----|
+      | d1 |
+      """
+
+      theme = Marcli.Theme.default()
+      result = Marcli.render(md)
+
+      assert result =~ theme.table_header <> "H1" <> theme.reset
+    end
+  end
+
   describe "mixed content" do
     test "renders heading followed by paragraph and list" do
       md = """

@@ -156,6 +156,70 @@ defmodule Marcli do
   defp render_block(%MDEx.HtmlBlock{literal: literal}, _nl, theme),
     do: theme.html_block <> String.trim_trailing(literal, "\n") <> theme.reset
 
+  defp render_block(%MDEx.Table{nodes: rows, alignments: alignments}, nl, theme) do
+    {header_data, body_data} =
+      rows
+      |> Enum.map(fn %MDEx.TableRow{nodes: cells, header: header} ->
+        rendered =
+          Enum.map(cells, fn
+            %MDEx.TableCell{nodes: children} -> render_inline(children, theme)
+            _other -> ""
+          end)
+
+        {header, rendered}
+      end)
+      |> Enum.split_with(fn {header, _} -> header end)
+      |> then(fn {h, b} ->
+        {Enum.map(h, &elem(&1, 1)), Enum.map(b, &elem(&1, 1))}
+      end)
+
+    all_data = header_data ++ body_data
+
+    col_widths =
+      case Enum.map(all_data, &length/1) do
+        [] ->
+          []
+
+        lengths ->
+          num_cols = Enum.max(lengths)
+
+          for col <- 0..(num_cols - 1) do
+            all_data
+            |> Enum.map(fn row -> row |> Enum.at(col, "") |> visual_width() end)
+            |> Enum.max(fn -> 0 end)
+            |> max(1)
+          end
+      end
+
+    if col_widths == [] do
+      ""
+    else
+      c = theme.table_chars
+      b = theme.table_border
+      r = theme.reset
+      v = b <> c.v <> r
+
+      top = b <> table_border_line(c.tl, c.h, c.tm, c.tr, col_widths) <> r
+      sep = b <> table_border_line(c.lm, c.h, c.x, c.rm, col_widths) <> r
+      bot = b <> table_border_line(c.bl, c.h, c.bm, c.br, col_widths) <> r
+
+      header_lines =
+        Enum.map(header_data, &render_table_row(&1, col_widths, alignments, v, theme, true))
+
+      body_lines =
+        Enum.map(body_data, &render_table_row(&1, col_widths, alignments, v, theme, false))
+
+      parts =
+        [top] ++
+          header_lines ++
+          if(header_data != [], do: [sep], else: []) ++
+          body_lines ++
+          [bot]
+
+      Enum.join(parts, nl)
+    end
+  end
+
   # Catch-all for unknown block nodes with children or literal
   defp render_block(%{nodes: children}, nl, theme) when is_list(children),
     do: Enum.map_join(children, nl, &render_block(&1, nl, theme))
@@ -189,7 +253,7 @@ defmodule Marcli do
   defp render_item_content(nodes, nl, theme) do
     Enum.map_join(nodes, nl <> theme.list_continuation, fn
       %MDEx.Paragraph{nodes: children} -> render_inline(children, theme)
-      block -> render_block(block, nl, theme)
+      block -> render_block(block, nl, theme) |> indent_continuation(nl, theme.list_continuation)
     end)
   end
 
@@ -249,6 +313,66 @@ defmodule Marcli do
     do: Enum.at(theme.ordered_glyphs, n - 1) || "(#{n})"
 
   defp glyph(n, _theme), do: "(#{n})"
+
+  # Indent all lines after the first by the given prefix.
+  # Used to keep nested block content aligned within list items.
+  defp indent_continuation(text, nl, indent) do
+    case String.split(text, nl) do
+      [_single] ->
+        text
+
+      [first | rest] ->
+        [first | Enum.map(rest, &(indent <> &1))]
+        |> Enum.join(nl)
+    end
+  end
+
+  # -- Table helpers ---------------------------------------------------------
+
+  defp table_border_line(left, h, mid, right, col_widths) do
+    inner = Enum.map_join(col_widths, mid, fn w -> String.duplicate(h, w + 2) end)
+    left <> inner <> right
+  end
+
+  defp render_table_row(cells, col_widths, alignments, v, theme, is_header) do
+    inner =
+      col_widths
+      |> Enum.with_index()
+      |> Enum.map(fn {width, idx} ->
+        content = Enum.at(cells, idx, "")
+        alignment = Enum.at(alignments || [], idx, :none)
+        padded = pad_cell(content, width, alignment)
+
+        if is_header,
+          do: " " <> theme.table_header <> padded <> theme.reset <> " ",
+          else: " " <> padded <> " "
+      end)
+      |> Enum.join(v)
+
+    v <> inner <> v
+  end
+
+  defp pad_cell(content, width, alignment) do
+    vis_w = visual_width(content)
+    padding = max(width - vis_w, 0)
+
+    case alignment do
+      :right ->
+        String.duplicate(" ", padding) <> content
+
+      :center ->
+        left = div(padding, 2)
+        right = padding - left
+        String.duplicate(" ", left) <> content <> String.duplicate(" ", right)
+
+      _left_or_none ->
+        content <> String.duplicate(" ", padding)
+    end
+  end
+
+  defp visual_width(text), do: text |> strip_ansi() |> String.length()
+
+  defp strip_ansi(text), do: String.replace(text, ~r/\e\[[0-9;]*m/, "")
 
   # Attempt syntax highlighting via Makeup when a lexer is available.
   # Returns the ANSI-formatted string or nil on fallback.
