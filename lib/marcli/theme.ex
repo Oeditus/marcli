@@ -226,8 +226,8 @@ defmodule Marcli.Theme do
   """
   @spec merge(keyword()) :: t()
   def merge(overrides) when is_list(overrides) do
-    Enum.reduce(overrides, default(), fn {key, value}, acc ->
-      if Map.has_key?(acc, key) do
+    Enum.reduce(overrides, default(), fn
+      {key, value}, acc when is_map_key(acc, key) ->
         existing = Map.get(acc, key)
 
         cond do
@@ -235,9 +235,9 @@ defmodule Marcli.Theme do
           is_map(existing) and is_nil(value) -> acc
           true -> %{acc | key => value}
         end
-      else
+
+      _, acc ->
         acc
-      end
     end)
   end
 

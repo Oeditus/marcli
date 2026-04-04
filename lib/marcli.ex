@@ -186,6 +186,7 @@ defmodule Marcli do
           for col <- 0..(num_cols - 1) do
             all_data
             |> Enum.map(fn row -> row |> Enum.at(col, "") |> visual_width() end)
+            # credo:disable-for-next-line
             |> Enum.max(fn -> 0 end)
             |> max(1)
           end
@@ -338,7 +339,7 @@ defmodule Marcli do
     inner =
       col_widths
       |> Enum.with_index()
-      |> Enum.map(fn {width, idx} ->
+      |> Enum.map_join(v, fn {width, idx} ->
         content = Enum.at(cells, idx, "")
         alignment = Enum.at(alignments || [], idx, :none)
         padded = pad_cell(content, width, alignment)
@@ -347,7 +348,6 @@ defmodule Marcli do
           do: " " <> theme.table_header <> padded <> theme.reset <> " ",
           else: " " <> padded <> " "
       end)
-      |> Enum.join(v)
 
     v <> inner <> v
   end
