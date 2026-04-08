@@ -2,7 +2,7 @@ defmodule Marcli.MixProject do
   use Mix.Project
 
   @app :marcli
-  @version "0.2.1"
+  @version "0.3.0"
   @source_url "https://github.com/Oeditus/marcli"
 
   def project do
@@ -50,6 +50,7 @@ defmodule Marcli.MixProject do
   defp deps do
     [
       {:mdex, "~> 0.11"},
+      {:color, "~> 0.3", optional: true},
       {:makeup, "~> 1.2", optional: true},
 
       # Dev / Test

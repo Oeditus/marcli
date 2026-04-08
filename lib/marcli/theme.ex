@@ -6,6 +6,35 @@ defmodule Marcli.Theme do
   in this struct: ANSI escape sequences, marker characters, glyphs,
   box-drawing characters, and sizing.
 
+  ## Color values
+
+  All fields that accept ANSI escape sequences (headings, inline
+  styles, code blocks, etc.) can be given in two forms:
+
+  * **Binary** -- a raw ANSI escape string such as `"\\e[1;33m"`,
+    exactly as before.
+
+  * **`{Color.input(), keyword()}`** -- a tuple where the first
+    element is anything `Color.new/1` accepts (a hex string like
+    `"#ff9900"`, a CSS named colour like `"red"`, an atom like
+    `:rebeccapurple`, or a `Color.*` struct) and the second element
+    is an options keyword passed to `Color.ANSI.to_string/2`.
+    Supported options are `:mode` (`:truecolor`, `:ansi256`,
+    `:ansi16`) and `:layer` (`:foreground`, `:background`).
+
+  The tuple form is resolved eagerly when the theme is constructed
+  via `merge/1` or `load/1`, so there is no runtime overhead.
+
+  Requires the optional `:color` dependency:
+
+      {:color, "~> 0.3", optional: true}
+
+  ### Examples
+
+      Marcli.Theme.merge(h1: {"#ff9900", mode: :truecolor})
+      Marcli.Theme.merge(h1: {"red", mode: :ansi256})
+      Marcli.Theme.merge(h1: {"red", mode: :ansi16, layer: :foreground})
+
   ## Loading from file
 
       theme = Marcli.Theme.load(".marcli.exs")
@@ -157,6 +186,15 @@ defmodule Marcli.Theme do
             syntax_highlight: true,
             syntax: @default_syntax
 
+  @typedoc """
+  A colour value accepted by theme fields.
+
+  Either a ready-made ANSI escape binary **or** a
+  `{Color.input(), keyword()}` tuple that will be resolved via
+  `Color.ANSI.to_string/2` at theme construction time.
+  """
+  @type color_input :: String.t() | {term(), keyword()}
+
   @type t :: %__MODULE__{
           reset: String.t(),
           h1: String.t(),
@@ -221,19 +259,32 @@ defmodule Marcli.Theme do
   @doc """
   Merges a keyword list of overrides into the default theme.
 
+  Colour values may be given as raw ANSI escape binaries or as
+  `{Color.input(), keyword()}` tuples that will be resolved via
+  `Color.ANSI.to_string/2`.  Map-valued fields (`:syntax`,
+  `:table_chars`) have their individual values resolved recursively.
+
       Marcli.Theme.merge(h1: "\\e[1;31m")
       #=> %Marcli.Theme{h1: "\\e[1;31m", ...defaults...}
+
+      Marcli.Theme.merge(h1: {"red", mode: :truecolor})
+      #=> %Marcli.Theme{h1: "\\e[38;2;255;0;0m", ...defaults...}
   """
   @spec merge(keyword()) :: t()
   def merge(overrides) when is_list(overrides) do
     Enum.reduce(overrides, default(), fn
       {key, value}, acc when is_map_key(acc, key) ->
-        existing = Map.get(acc, key)
+        case {Map.get(acc, key), value} do
+          {%{}, nil} ->
+            acc
 
-        cond do
-          is_map(existing) and is_map(value) -> %{acc | key => Map.merge(existing, value)}
-          is_map(existing) and is_nil(value) -> acc
-          true -> %{acc | key => value}
+          {%{} = existing, %{} = value} ->
+            # credo:disable-for-next-line
+            resolved = Map.new(value, fn {k, v} -> {k, resolve_color(v)} end)
+            %{acc | key => Map.merge(existing, resolved)}
+
+          _ ->
+            %{acc | key => resolve_color(value)}
         end
 
       _, acc ->
@@ -246,4 +297,40 @@ defmodule Marcli.Theme do
   @doc "Returns the default syntax highlighting color map."
   @spec default_syntax :: %{atom() => String.t()}
   def default_syntax, do: @default_syntax
+
+  @doc """
+  Resolves a colour value to an ANSI escape binary.
+
+  Returns binaries unchanged.  For `{Color.input(), keyword()}`
+  tuples, delegates to `Color.ANSI.to_string/2` (requires the
+  optional `:color` dependency).
+
+  ## Examples
+
+      iex> Marcli.Theme.resolve_color("\\e[31m")
+      "\\e[31m"
+
+      iex> Marcli.Theme.resolve_color({"red", []})
+      "\\e[38;2;255;0;0m"
+
+      iex> Marcli.Theme.resolve_color({"#00ff00", mode: :ansi256})
+      "\\e[38;5;46m"
+
+  """
+  @spec resolve_color(color_input()) :: String.t()
+  def resolve_color(value)
+
+  def resolve_color(binary) when is_binary(binary), do: binary
+
+  def resolve_color({color, opts}) when is_list(opts) do
+    unless Code.ensure_loaded?(Color.ANSI) do
+      raise ArgumentError,
+            "tuple colour values require the :color dependency " <>
+              "({:color, \"~> 0.3\"} in mix.exs)"
+    end
+
+    Color.ANSI.to_string(color, opts)
+  end
+
+  def resolve_color(other), do: other
 end
