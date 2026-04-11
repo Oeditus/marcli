@@ -2,7 +2,7 @@ defmodule Marcli.MixProject do
   use Mix.Project
 
   @app :marcli
-  @version "0.3.0"
+  @version "0.3.1"
   @source_url "https://github.com/Oeditus/marcli"
 
   def project do

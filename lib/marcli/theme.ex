@@ -326,10 +326,11 @@ defmodule Marcli.Theme do
     unless Code.ensure_loaded?(Color.ANSI) do
       raise ArgumentError,
             "tuple colour values require the :color dependency " <>
-              "({:color, \"~> 0.3\"} in mix.exs)"
+              "({:color, \"~> 0.4\"} in mix.exs)"
     end
 
-    Color.ANSI.to_string(color, opts)
+    # credo:disable-for-next-line
+    apply(Color.ANSI, :to_string, [color, opts])
   end
 
   def resolve_color(other), do: other
