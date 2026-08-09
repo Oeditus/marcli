@@ -322,7 +322,7 @@ defmodule MarcliTest do
       assert result =~ theme.table_header <> "H1" <> theme.reset
     end
 
-    test "supports multiline cells via MdexMultilineCells plugin" do
+    test "supports multiline cells via MdexMultilineCells plugin with proper ASCII alignment" do
       md = """
       | Col 1 | Col 2 |
       | --- | --- |
@@ -333,9 +333,33 @@ defmodule MarcliTest do
       result = Marcli.render(md)
       plain = String.replace(result, ~r/\e\[[0-9;]*m/, "")
 
-      assert plain =~ "Line 1"
-      assert plain =~ "Line 2"
-      assert plain =~ "Cell 2"
+      lines = String.split(plain, "\n")
+      # Header border, Header row, Sep, Subline 1, Subline 2, Bottom border
+      assert length(lines) == 6
+
+      # All lines in the table must have the exact same line length
+      line_lengths = Enum.map(lines, &String.length/1)
+      assert Enum.uniq(line_lengths) |> length() == 1
+
+      assert plain =~ "│ Line 1  │ Cell 2 │"
+      assert plain =~ "│ Line 2  │        │"
+    end
+
+    test "renders multiline cell fixture files cleanly" do
+      for fixture <- ["multiline-cell.md", "multiline-cell-no-border.md"] do
+        fixture_path = Path.join(["test", "fixtures", fixture])
+        fixture_md = File.read!(fixture_path)
+        result = Marcli.render(fixture_md)
+        plain = String.replace(result, ~r/\e\[[0-9;]*m/, "")
+        lines = String.split(plain, "\n")
+
+        # Every line in the rendered table must have matching width
+        line_lengths = Enum.map(lines, &String.length/1)
+        assert Enum.uniq(line_lengths) |> length() == 1
+
+        assert plain =~ "Synchronous DB writes in hot path"
+        assert plain =~ "or use a GenServer/Agent collector that batches"
+      end
     end
   end
 

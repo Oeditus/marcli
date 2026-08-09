@@ -192,7 +192,12 @@ defmodule Marcli do
 
           for col <- 0..(num_cols - 1) do
             all_data
-            |> Enum.map(fn row -> row |> Enum.at(col, "") |> visual_width() end)
+            |> Enum.flat_map(fn row ->
+              row
+              |> Enum.at(col, "")
+              |> String.split("\n")
+            end)
+            |> Enum.map(&visual_width/1)
             # credo:disable-for-next-line
             |> Enum.max(fn -> 0 end)
             |> max(1)
@@ -212,10 +217,10 @@ defmodule Marcli do
       bot = b <> table_border_line(c.bl, c.h, c.bm, c.br, col_widths) <> r
 
       header_lines =
-        Enum.map(header_data, &render_table_row(&1, col_widths, alignments, v, theme, true))
+        Enum.map(header_data, &render_table_row(&1, col_widths, alignments, v, theme, true, nl))
 
       body_lines =
-        Enum.map(body_data, &render_table_row(&1, col_widths, alignments, v, theme, false))
+        Enum.map(body_data, &render_table_row(&1, col_widths, alignments, v, theme, false, nl))
 
       parts =
         [top] ++
@@ -342,13 +347,25 @@ defmodule Marcli do
     left <> inner <> right
   end
 
-  defp render_table_row(cells, col_widths, alignments, v, theme, is_header) do
+  defp render_table_row(cells, col_widths, alignments, v, theme, is_header, nl) do
+    cell_lines = Enum.map(cells, &String.split(&1, "\n"))
+    row_height = cell_lines |> Enum.map(&length/1) |> Enum.max(fn -> 1 end)
+
+    0..(row_height - 1)
+    |> Enum.map_join(
+      nl,
+      &render_row_subline(&1, cell_lines, col_widths, alignments, v, theme, is_header)
+    )
+  end
+
+  defp render_row_subline(line_idx, cell_lines, col_widths, alignments, v, theme, is_header) do
     inner =
       col_widths
       |> Enum.with_index()
-      |> Enum.map_join(v, fn {width, idx} ->
-        content = Enum.at(cells, idx, "")
-        alignment = Enum.at(alignments || [], idx, :none)
+      |> Enum.map_join(v, fn {width, col_idx} ->
+        lines_for_col = Enum.at(cell_lines, col_idx, [])
+        content = Enum.at(lines_for_col, line_idx, "")
+        alignment = Enum.at(alignments || [], col_idx, :none)
         padded = pad_cell(content, width, alignment)
 
         if is_header,
