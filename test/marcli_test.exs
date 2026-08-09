@@ -321,6 +321,22 @@ defmodule MarcliTest do
 
       assert result =~ theme.table_header <> "H1" <> theme.reset
     end
+
+    test "supports multiline cells via MdexMultilineCells plugin" do
+      md = """
+      | Col 1 | Col 2 |
+      | --- | --- |
+      | Line 1 \\
+      Line 2 | Cell 2 |
+      """
+
+      result = Marcli.render(md)
+      plain = String.replace(result, ~r/\e\[[0-9;]*m/, "")
+
+      assert plain =~ "Line 1"
+      assert plain =~ "Line 2"
+      assert plain =~ "Cell 2"
+    end
   end
 
   describe "mixed content" do

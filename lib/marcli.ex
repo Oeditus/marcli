@@ -51,6 +51,7 @@ defmodule Marcli do
   alias Marcli.Theme
 
   @parse_opts [
+    plugins: [MdexMultilineCells],
     extension: [
       strikethrough: true,
       tasklist: true,
