@@ -447,4 +447,83 @@ defmodule MarcliTest do
       assert result =~ theme.code_text <> "def foo, do: :ok" <> theme.reset
     end
   end
+
+  describe "lmml support" do
+    test "@foo.bar file references in prose" do
+      result = Marcli.render("Please check @diagram.png and @foo.bar.")
+      theme = Marcli.Theme.default()
+
+      assert result =~ "Please check "
+      assert result =~ theme.lmml_ref <> "@diagram.png" <> theme.reset
+      assert result =~ " and "
+      assert result =~ theme.lmml_ref <> "@foo.bar" <> theme.reset
+      assert result =~ "."
+    end
+
+    test "@foo.bar inside code spans is not converted to an lmml reference" do
+      result = Marcli.render("Use `@foo.bar` here and @foo.bar outside.")
+      theme = Marcli.Theme.default()
+
+      assert result =~ theme.inline_code <> "@foo.bar" <> theme.reset
+      assert result =~ " here and "
+      assert result =~ theme.lmml_ref <> "@foo.bar" <> theme.reset
+    end
+
+    test "@@@ embeds render with double-line border and header" do
+      md = """
+      @@@settings.json
+      {"key": "value"}
+      @@@
+      """
+
+      result = Marcli.render(md)
+      theme = Marcli.Theme.default()
+
+      assert result =~
+               theme.lmml_embed_border <> theme.lmml_embed_top <> " settings.json" <> theme.reset
+
+      assert result =~ theme.lmml_embed_border <> theme.lmml_embed_left <> theme.reset
+      assert result =~ "{\"key\": \"value\"}"
+      assert result =~ theme.lmml_embed_border <> theme.lmml_embed_bottom <> theme.reset
+    end
+
+    test "@@@ embed content language is derived from file extension" do
+      md = """
+      @@@settings.ex
+      def foo, do: :ok
+      @@@
+      """
+
+      result = Marcli.render(md)
+      theme = Marcli.Theme.default()
+
+      # Makeup should highlight 'def' as keyword_declaration using .ex -> elixir
+      assert result =~ theme.syntax.keyword_declaration <> "def" <> theme.reset
+      assert result =~ theme.syntax.name_function <> "foo" <> theme.reset
+
+      assert result =~
+               theme.lmml_embed_border <> theme.lmml_embed_top <> " settings.ex" <> theme.reset
+    end
+
+    test "customizing lmml theme styles" do
+      custom_theme = %{
+        Marcli.Theme.default()
+        | lmml_ref: "\e[1;35m",
+          lmml_embed_left: "  || "
+      }
+
+      md = """
+      Check @config.yaml
+
+      @@@config.yaml
+      key: 1
+      @@@
+      """
+
+      result = Marcli.render(md, theme: custom_theme)
+
+      assert result =~ "\e[1;35m@config.yaml\e[0m"
+      assert result =~ "  || "
+    end
+  end
 end

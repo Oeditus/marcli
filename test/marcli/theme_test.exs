@@ -78,6 +78,12 @@ defmodule Marcli.ThemeTest do
       theme = Theme.merge(thematic_break_width: 80)
       assert theme.thematic_break_width == 80
     end
+
+    test "resolves lmml theme overrides" do
+      theme = Theme.merge(lmml_ref: "\e[35m", lmml_embed_top: "  #--")
+      assert theme.lmml_ref == "\e[35m"
+      assert theme.lmml_embed_top == "  #--"
+    end
   end
 
   describe "full render with color-tuple theme" do

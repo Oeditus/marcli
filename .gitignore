@@ -27,4 +27,6 @@ marcli-*.tar
 
 /.elixir-tools/
 /.elixir_ls/
+/.ragex/
+/.yoke/
 /.erl.history/

@@ -49,7 +49,8 @@ defmodule Marcli.MixProject do
 
   defp deps do
     [
-      {:mdex_multiline_cells, "~> 0.1"},
+      {:mdex_lmml, ">= 0.0.0"},
+      {:mdex_multiline_cells, ">= 0.0.0"},
       {:mdex, "~> 0.11"},
       {:color, "~> 0.3", optional: true},
       {:makeup, "~> 1.2", optional: true},

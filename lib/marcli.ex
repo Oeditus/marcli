@@ -16,6 +16,8 @@ defmodule Marcli do
   - Links (underlined blue with dimmed URL)
   - Images (bracketed alt text with URL)
   - Task list items (checkbox markers)
+  - LMML embeds (`@@@file.ext ... @@@` fenced blocks with double-line borders and language detection from extension)
+  - LMML references (`@file.ext` mentions in prose styled as references)
 
   ## Syntax Highlighting
 
@@ -61,6 +63,33 @@ defmodule Marcli do
     ]
   ]
 
+  @extension_languages %{
+    ".yaml" => "yaml",
+    ".yml" => "yaml",
+    ".json" => "json",
+    ".toml" => "toml",
+    ".xml" => "xml",
+    ".csv" => "csv",
+    ".html" => "html",
+    ".htm" => "html",
+    ".ex" => "elixir",
+    ".exs" => "elixir",
+    ".erl" => "erlang",
+    ".py" => "python",
+    ".rb" => "ruby",
+    ".rs" => "rust",
+    ".js" => "javascript",
+    ".ts" => "typescript",
+    ".sh" => "bash",
+    ".sql" => "sql",
+    ".diff" => "diff",
+    ".patch" => "diff",
+    ".md" => "markdown",
+    ".lmml" => "lmml",
+    ".txt" => "text",
+    ".log" => "text"
+  }
+
   @type option :: {:newline, String.t()} | {:theme, Theme.t()} | {:escape_sequences, boolean()}
 
   @doc """
@@ -84,10 +113,37 @@ defmodule Marcli do
 
     result =
       markdown
-      |> MDEx.parse_document!(@parse_opts)
+      |> preprocess_markdown()
+      |> parse_markdown()
+      |> transform_ast()
       |> render_document(nl, theme)
 
     if keep_ansi?, do: result, else: strip_ansi(result)
+  end
+
+  defp preprocess_markdown(markdown) do
+    MdexLmml.Preprocessor.preprocess(markdown)
+  end
+
+  defp parse_markdown(markdown) do
+    MDEx.parse_document!(markdown, @parse_opts)
+  end
+
+  defp transform_ast(%MDEx.Document{} = doc) do
+    # Keep lmml-embed code blocks intact so render_block can style them
+    preserved =
+      MDEx.traverse_and_update(doc, fn
+        %MDEx.CodeBlock{info: "lmml-embed:" <> name} = cb ->
+          %{cb | info: "lmml-embed-keep:" <> name}
+
+        other ->
+          other
+      end)
+
+    MdexLmml.AST.transform(
+      preserved,
+      render_reference: fn name, _opts -> "<lmml-ref>" <> name <> "</lmml-ref>" end
+    )
   end
 
   defp render_document(%MDEx.Document{nodes: nodes}, nl, theme) do
@@ -119,6 +175,36 @@ defmodule Marcli do
     items
     |> Enum.with_index(start || 1)
     |> Enum.map_join(nl, fn {item, idx} -> render_ordered_item(item, idx, nl, theme) end)
+  end
+
+  defp render_block(
+         %MDEx.CodeBlock{literal: literal, info: "lmml-embed-keep:" <> name},
+         nl,
+         theme
+       ) do
+    code = String.trim_trailing(literal, "\n")
+    lang = language_from_name(name)
+    highlighted = maybe_highlight(code, lang, theme)
+    lines = String.split(highlighted || code, "\n")
+    prefix = theme.lmml_embed_border <> theme.lmml_embed_left <> theme.reset
+
+    header =
+      if name != "",
+        do: theme.lmml_embed_border <> theme.lmml_embed_top <> " " <> name <> theme.reset <> nl,
+        else: theme.lmml_embed_border <> theme.lmml_embed_top <> theme.reset <> nl
+
+    body =
+      Enum.map_join(lines, nl, fn line ->
+        if highlighted do
+          prefix <> line
+        else
+          prefix <> theme.lmml_embed_text <> line <> theme.reset
+        end
+      end)
+
+    footer = nl <> theme.lmml_embed_border <> theme.lmml_embed_bottom <> theme.reset
+
+    header <> body <> footer
   end
 
   defp render_block(%MDEx.CodeBlock{literal: literal, info: info}, nl, theme) do
@@ -308,6 +394,11 @@ defmodule Marcli do
   defp render_inline_node(%MDEx.SoftBreak{}, _theme), do: " "
   defp render_inline_node(%MDEx.LineBreak{}, _theme), do: "\n"
 
+  defp render_inline_node(%MDEx.HtmlInline{literal: "<lmml-ref>" <> rest}, theme) do
+    name = String.replace_suffix(rest, "</lmml-ref>", "")
+    theme.lmml_ref <> "@" <> name <> theme.reset
+  end
+
   defp render_inline_node(%MDEx.HtmlInline{literal: literal}, _theme), do: literal
 
   defp render_inline_node(%MDEx.ShortCode{emoji: emoji}, _theme) when is_binary(emoji), do: emoji
@@ -431,4 +522,9 @@ defmodule Marcli do
     do: info |> String.split() |> List.first() |> Kernel.||("") |> String.downcase()
 
   defp extract_language(_), do: nil
+
+  defp language_from_name(name) when is_binary(name) do
+    ext = Path.extname(name) |> String.downcase()
+    Map.get(@extension_languages, ext, String.trim_leading(ext, "."))
+  end
 end

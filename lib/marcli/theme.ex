@@ -140,6 +140,14 @@ defmodule Marcli.Theme do
             code_left: "  \u2502 ",
             code_bottom: "  \u2514\u2500",
 
+            # LMML embeds and references
+            lmml_ref: "\e[4m\e[34m",
+            lmml_embed_border: "\e[2m",
+            lmml_embed_text: "\e[32m",
+            lmml_embed_top: "  \u2553\u2500",
+            lmml_embed_left: "  \u2551 ",
+            lmml_embed_bottom: "  \u2559\u2500",
+
             # Block quotes
             block_quote: "\e[2m",
             block_quote_prefix: "  \u2502 ",
@@ -215,6 +223,12 @@ defmodule Marcli.Theme do
           code_top: String.t(),
           code_left: String.t(),
           code_bottom: String.t(),
+          lmml_ref: String.t(),
+          lmml_embed_border: String.t(),
+          lmml_embed_text: String.t(),
+          lmml_embed_top: String.t(),
+          lmml_embed_left: String.t(),
+          lmml_embed_bottom: String.t(),
           block_quote: String.t(),
           block_quote_prefix: String.t(),
           bullet_marker: String.t(),

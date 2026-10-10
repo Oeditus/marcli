@@ -50,6 +50,14 @@
   code_left: "  │ ",
   code_bottom: "  └─",
 
+  # -- LMML embeds and references ---------------------------------------------
+  lmml_ref: "\e[4m\e[34m",
+  lmml_embed_border: "\e[2m",
+  lmml_embed_text: "\e[32m",
+  lmml_embed_top: "  ╓─",
+  lmml_embed_left: "  ║ ",
+  lmml_embed_bottom: "  ╙─",
+
   # -- Block quotes -----------------------------------------------------------
   block_quote: "\e[2m",
   block_quote_prefix: "  │ ",
